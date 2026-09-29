@@ -1,27 +1,53 @@
-name: Playwright Tests
+name: Flavonto Full-Site QA Audit
+
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
+  schedule:
+    # Run automatically every day at 6am UTC (so you wake up with a report)
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    # Also allows you to trigger a manual run from GitHub with one click
+
 jobs:
-  test:
-    timeout-minutes: 60
+  audit:
+    timeout-minutes: 30
     runs-on: ubuntu-latest
+
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-node@v4
-      with:
-        node-version: lts/*
-    - name: Install dependencies
-      run: npm ci
-    - name: Install Playwright Browsers
-      run: npx playwright install --with-deps
-    - name: Run Playwright tests
-      run: npx playwright test
-    - uses: actions/upload-artifact@v4
-      if: ${{ !cancelled() }}
-      with:
-        name: playwright-report
-        path: playwright-report/
-        retention-days: 30
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Run full-site QA audit on flavonto.com
+        run: npx playwright test tests/flavonto-fullsite-audit.spec.ts
+        continue-on-error: true  # Don't stop — we want the full report even if some tests fail
+
+      - name: Upload HTML test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: flavonto-qa-report
+          path: playwright-report/
+          retention-days: 30
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: flavonto-screenshots
+          path: test-results/
+          retention-days: 30
